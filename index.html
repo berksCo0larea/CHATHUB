@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>THE CHAT PLACE</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#181818;
+  --border:#242424;--border-hi:#3a3a3a;
+  --text:#f0f0f0;--muted:#666;--dim:#2e2e2e;
+  --owner:#ff3c3c;--owner-bg:rgba(255,60,60,0.1);
+  --green:#4dff91;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Space Mono',monospace;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:radial-gradient(circle,rgba(255,255,255,0.05) 1px,transparent 1px);
+  background-size:22px 22px;
+}
+
+/* ── HEADER ── */
+header{
+  position:relative;z-index:30;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;height:52px;flex-shrink:0;
+  border-bottom:1px solid var(--border);
+  background:rgba(10,10,10,0.98);
+}
+.logo{
+  display:flex;align-items:center;gap:10px;
+  font-weight:700;font-size:12px;letter-spacing:0.28em;color:var(--text);
+  flex-shrink:0;
+}
+.logo-dot{
+  width:8px;height:8px;border-radius:50%;background:#fff;
+  animation:blink 2.4s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.65)}}
+
+/* header right: online pill + owner btn side by side */
+.header-right{
+  display:flex;align-items:center;gap:12px;
+  flex-shrink:0;
+}
+.online-pill{
+  display:flex;align-items:center;gap:5px;
+  font-size:9px;color:var(--muted);letter-spacing:.12em;white-space:nowrap;
+}
+.online-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--green);
+  flex-shrink:0;
+  animation:blink 1.6s ease-in-out infinite;
+}
+
+/* ── OWNER BUTTON (inside header-right) ── */
+#owner-trigger{
+  background:transparent;
+  border:1px solid var(--border-hi);
+  border-radius:2px;
+  color:var(--muted);
+  font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:.15em;padding:5px 10px;cursor:pointer;
+  transition:border-color .2s,color .2s,background .2s;
+  white-space:nowrap;flex-shrink:0;
+}
+#owner-trigger:hover{border-color:var(--owner);color:var(--owner);}
+#owner-trigger.active{border-color:var(--owner);color:var(--owner);background:var(--owner-bg);}
+
+/* ── OWNER DROPDOWN — anchored below header ── */
+#owner-dropdown{
+  position:fixed;
+  top:52px;          /* exactly below the 52px header */
+  right:16px;
+  z-index:200;
+  background:var(--surface);
+  border:1px solid rgba(255,60,60,.55);
+  border-top:none;
+  border-radius:0 0 3px 3px;
+  width:256px;
+  overflow:hidden;
+  max-height:0;
+  opacity:0;
+  pointer-events:none;
+  transition:max-height .32s cubic-bezier(.4,0,.2,1), opacity .22s ease;
+}
+#owner-dropdown.open{
+  max-height:560px;
+  opacity:1;
+  pointer-events:auto;
+}
+
+/* login form */
+#owner-login-form{
+  padding:16px;
+  display:flex;flex-direction:column;gap:10px;
+}
+.owner-title{
+  font-size:9px;letter-spacing:.22em;color:var(--owner);font-weight:700;
+}
+.o-input{
+  background:var(--surface2);border:1px solid var(--border);border-radius:2px;
+  color:var(--text);font-family:'Space Mono',monospace;font-size:11px;
+  padding:7px 10px;outline:none;width:100%;
+  transition:border-color .18s;
+}
+.o-input:focus{border-color:var(--border-hi);}
+.o-input::placeholder{color:#333;}
+#owner-login-btn{
+  background:var(--owner-bg);border:1px solid rgba(255,60,60,.4);border-radius:2px;
+  color:var(--owner);font-family:'Space Mono',monospace;font-weight:700;
+  font-size:10px;letter-spacing:.15em;padding:8px;cursor:pointer;
+  transition:background .15s;
+}
+#owner-login-btn:hover{background:rgba(255,60,60,.2);}
+#owner-err{
+  font-size:9px;color:var(--owner);letter-spacing:.1em;
+  opacity:0;transition:opacity .2s;
+}
+#owner-err.show{opacity:1;}
+
+/* panel */
+#owner-panel-inner{
+  padding:14px;display:none;flex-direction:column;gap:11px;
+}
+#owner-panel-inner.visible{display:flex;}
+.panel-section{display:flex;flex-direction:column;gap:7px;}
+.panel-label{font-size:9px;color:var(--muted);letter-spacing:.18em;}
+.color-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;}
+.cswatch{
+  width:18px;height:18px;border-radius:2px;cursor:pointer;
+  border:2px solid transparent;transition:border-color .12s,transform .1s;
+  flex-shrink:0;
+}
+.cswatch:hover{transform:scale(1.18);}
+.cswatch.sel{border-color:#fff;}
+.p-btn{
+  background:transparent;border:1px solid var(--border-hi);border-radius:2px;
+  color:var(--muted);font-family:'Space Mono',monospace;font-size:9px;
+  letter-spacing:.12em;padding:7px 10px;cursor:pointer;
+  transition:all .14s;text-align:left;
+}
+.p-btn:hover{color:var(--text);background:var(--surface2);}
+.p-btn.danger{border-color:rgba(255,60,60,.25);color:rgba(255,90,90,.65);}
+.p-btn.danger:hover{background:var(--owner-bg);color:var(--owner);}
+.panel-divider{border:none;border-top:1px solid var(--border);margin:0;}
+#owner-out-btn{
+  background:none;border:none;font-family:'Space Mono',monospace;
+  font-size:8px;color:#333;letter-spacing:.1em;cursor:pointer;
+  padding:2px;text-align:center;transition:color .15s;
+}
+#owner-out-btn:hover{color:var(--muted);}
+
+/* ── USERNAME BAR ── */
+#username-bar{
+  position:relative;z-index:10;flex-shrink:0;
+  display:flex;align-items:center;gap:8px;
+  padding:7px 20px;
+  border-bottom:1px solid var(--border);
+  background:rgba(12,12,12,0.95);
+}
+#uname-input{
+  background:var(--surface2);border:1px solid var(--border);border-radius:2px;
+  color:var(--text);font-family:'Space Mono',monospace;font-size:11px;
+  padding:6px 10px;outline:none;transition:border-color .18s;width:160px;
+}
+#uname-input:focus{border-color:var(--border-hi);}
+#uname-input::placeholder{color:#333;}
+#set-name-btn{
+  background:var(--text);color:var(--bg);
+  border:none;border-radius:2px;
+  font-family:'Space Mono',monospace;font-weight:700;font-size:10px;
+  letter-spacing:.15em;padding:6px 12px;cursor:pointer;
+  transition:opacity .14s,transform .1s;white-space:nowrap;
+}
+#set-name-btn:hover{opacity:.82;}
+#set-name-btn:active{transform:scale(.97);}
+.ubar-label{font-size:9px;color:var(--muted);letter-spacing:.18em;white-space:nowrap;}
+#current-name-display{
+  font-size:11px;font-weight:700;letter-spacing:.08em;
+}
+#change-btn{
+  font-size:9px;color:#333;letter-spacing:.1em;cursor:pointer;
+  background:none;border:none;font-family:'Space Mono',monospace;
+  transition:color .14s;padding:0 2px;
+}
+#change-btn:hover{color:var(--muted);}
+
+/* show/hide helpers */
+.gone{display:none!important;}
+
+/* ── MESSAGES ── */
+#messages-wrap{
+  flex:1;overflow-y:auto;position:relative;z-index:1;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+#messages-wrap::-webkit-scrollbar{width:3px;}
+#messages-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+#messages-list{padding:10px 0 6px;}
+
+.msg{
+  padding:5px 20px;display:flex;gap:11px;align-items:flex-start;
+  transition:background .12s;
+  animation:fadeUp .18s ease both;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.msg:hover{background:rgba(255,255,255,0.016);}
+.msg-avatar{
+  width:28px;height:28px;border-radius:2px;
+  background:var(--surface2);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;flex-shrink:0;margin-top:2px;
+}
+.msg-body{flex:1;min-width:0;}
+.msg-head{
+  display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap;
+}
+.msg-name{font-size:11px;font-weight:700;color:var(--text);letter-spacing:.05em;}
+.msg-name.is-owner{color:var(--owner);}
+.owner-tag{
+  background:var(--owner-bg);color:var(--owner);
+  border:1px solid rgba(255,60,60,.22);border-radius:2px;
+  font-size:8px;padding:1px 5px;letter-spacing:.14em;font-weight:700;
+}
+.u-tag{
+  border-radius:2px;font-size:8px;padding:1px 5px;
+  letter-spacing:.12em;font-weight:700;border:1px solid;
+}
+.msg-time{font-size:8px;color:#2e2e2e;letter-spacing:.04em;margin-left:auto;}
+.msg-text{
+  font-size:12px;color:rgba(240,240,240,.8);line-height:1.65;word-break:break-word;
+}
+.msg-sys{
+  padding:4px 20px;text-align:center;
+  font-size:9px;color:#2a2a2a;letter-spacing:.13em;
+}
+
+/* ── FOOTER ── */
+#chat-footer{
+  position:relative;z-index:10;flex-shrink:0;
+  border-top:1px solid var(--border);padding:10px 16px;
+  background:rgba(10,10,10,.98);
+  display:flex;gap:8px;align-items:center;
+}
+#msg-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:2px;
+  color:var(--text);font-family:'Space Mono',monospace;font-size:12px;
+  padding:9px 13px;outline:none;transition:border-color .18s;
+}
+#msg-input:focus{border-color:var(--border-hi);}
+#msg-input::placeholder{color:#333;}
+#send-btn{
+  background:transparent;border:1px solid var(--border-hi);border-radius:2px;
+  color:var(--muted);font-family:'Space Mono',monospace;font-size:10px;
+  letter-spacing:.12em;padding:0 16px;height:38px;cursor:pointer;
+  transition:all .14s;white-space:nowrap;
+}
+#send-btn:hover{background:var(--surface2);color:var(--text);border-color:var(--text);}
+#send-btn:active{transform:scale(.97);}
+#chat-locked{
+  flex-shrink:0;border-top:1px solid var(--border);
+  padding:12px 20px;text-align:center;
+  font-size:9px;color:#2e2e2e;letter-spacing:.15em;
+  background:rgba(10,10,10,.98);
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    THE CHAT PLACE
+  </div>
+  <!-- online + owner button sit together, no overlap -->
+  <div class="header-right">
+    <div class="online-pill">
+      <div class="online-dot"></div>
+      <span id="online-num">0</span>&nbsp;ONLINE
+    </div>
+    <button id="owner-trigger">⬡ OWNER</button>
+  </div>
+</header>
+
+<!-- OWNER DROPDOWN (outside header, anchored by CSS top:52px) -->
+<div id="owner-dropdown">
+  <div id="owner-login-form">
+    <div class="owner-title">⬡ OWNER ACCESS</div>
+    <input class="o-input" id="owner-pass-input" type="password" placeholder="password" autocomplete="new-password"/>
+    <button id="owner-login-btn">UNLOCK →</button>
+    <div id="owner-err">INCORRECT PASSWORD</div>
+  </div>
+  <div id="owner-panel-inner">
+    <div class="owner-title">⬡ OWNER CONTROLS</div>
+    <div class="panel-section">
+      <div class="panel-label">ASSIGN TAG</div>
+      <input class="o-input" id="tag-target" placeholder="username"/>
+      <input class="o-input" id="tag-text" placeholder="tag text (MOD, VIP…)" maxlength="12"/>
+      <div class="color-row" id="color-row"></div>
+      <button class="p-btn" id="assign-tag-btn">+ ASSIGN TAG</button>
+      <button class="p-btn danger" id="remove-tag-btn">✕ REMOVE TAG</button>
+    </div>
+    <div class="panel-divider"></div>
+    <div class="panel-section">
+      <div class="panel-label">DELETE MESSAGE</div>
+      <input class="o-input" id="del-msg-id" placeholder="hover timestamp → copy key"/>
+      <button class="p-btn danger" id="del-msg-btn">✕ DELETE</button>
+    </div>
+    <button id="owner-out-btn">sign out</button>
+  </div>
+</div>
+
+<!-- USERNAME BAR -->
+<div id="username-bar">
+  <span class="ubar-label">YOU</span>
+  <input id="uname-input" maxlength="20" placeholder="pick a username…" autocomplete="off" spellcheck="false"/>
+  <button id="set-name-btn">JOIN →</button>
+  <span id="current-name-display" class="gone"></span>
+  <button id="change-btn" class="gone">change</button>
+</div>
+
+<!-- MESSAGES -->
+<div id="messages-wrap">
+  <div id="messages-list"></div>
+</div>
+
+<!-- FOOTER -->
+<div id="chat-footer" class="gone"></div><!-- placeholder to keep layout; real footer below -->
+<footer id="chat-footer-real" class="gone">
+  <input id="msg-input" type="text" placeholder="TYPE A MESSAGE…" maxlength="500" autocomplete="off" spellcheck="false"/>
+  <button id="send-btn">SEND</button>
+</footer>
+<div id="chat-locked">SET A USERNAME ABOVE TO START CHATTING</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getDatabase, ref, push, onValue, remove, set, onDisconnect, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const app = initializeApp({
+  apiKey:"AIzaSyAALDEurhZTifPOLej2ZryK95TyhvwfTcE",
+  authDomain:"the-chat-place.firebaseapp.com",
+  projectId:"the-chat-place",
+  storageBucket:"the-chat-place.firebasestorage.app",
+  messagingSenderId:"633015551676",
+  appId:"1:633015551676:web:b6c3e7aa876daeb55af2b9"
+});
+const db = getDatabase(app);
+
+const OWNER_PASS = "bobiscool2375";
+const OWNER_NAME = "Dev";
+const OWNER_BADGE = "</> /Owner";
+const TAG_COLORS  = ["#7fff7f","#7fd4ff","#ffdf7f","#df7fff","#ff9f7f","#ff6060"];
+
+let currentUser   = null;
+let isOwner       = false;
+let presenceRef   = null;
+let selectedColor = TAG_COLORS[0];
+let cachedTags    = {};
+let lastSnap      = null;
+
+// ─── colour swatches ───────────────────────────────────────────
+TAG_COLORS.forEach((c,i) => {
+  const s = document.createElement("div");
+  s.className = "cswatch" + (i===0 ? " sel" : "");
+  s.style.background = c; s.dataset.c = c;
+  s.onclick = () => {
+    document.querySelectorAll(".cswatch").forEach(x => x.classList.remove("sel"));
+    s.classList.add("sel");
+    selectedColor = c;
+  };
+  document.getElementById("color-row").appendChild(s);
+});
+
+// ─── owner dropdown toggle ─────────────────────────────────────
+const trigger  = document.getElementById("owner-trigger");
+const dropdown = document.getElementById("owner-dropdown");
+
+trigger.addEventListener("click", e => {
+  e.stopPropagation();
+  const opening = !dropdown.classList.contains("open");
+  dropdown.classList.toggle("open", opening);
+  trigger.classList.toggle("active", opening);
+});
+
+document.addEventListener("click", e => {
+  if (!dropdown.contains(e.target) && e.target !== trigger) {
+    dropdown.classList.remove("open");
+    trigger.classList.remove("active");
+  }
+});
+
+// ─── owner login ───────────────────────────────────────────────
+document.getElementById("owner-login-btn").addEventListener("click", tryOwnerLogin);
+document.getElementById("owner-pass-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") tryOwnerLogin();
+});
+
+function tryOwnerLogin() {
+  const val = document.getElementById("owner-pass-input").value;
+  if (val === OWNER_PASS) {
+    isOwner = true;
+    // swap form → panel
+    document.getElementById("owner-login-form").classList.add("gone");
+    document.getElementById("owner-panel-inner").classList.add("visible");
+    document.getElementById("owner-panel-inner").style.display = "flex";
+    // style trigger as active-owner
+    trigger.style.cssText = "border-color:var(--owner);color:var(--owner);background:var(--owner-bg);";
+    // if already chatting, switch identity to Dev
+    if (currentUser && currentUser !== OWNER_NAME) {
+      currentUser = OWNER_NAME;
+      if (presenceRef) remove(presenceRef);
+      spawnPresence(OWNER_NAME);
+      refreshNameBar();
+    }
+  } else {
+    const err = document.getElementById("owner-err");
+    err.classList.add("show");
+    setTimeout(() => err.classList.remove("show"), 2200);
+    document.getElementById("owner-pass-input").value = "";
+  }
+}
+
+document.getElementById("owner-out-btn").addEventListener("click", () => {
+  isOwner = false;
+  // swap panel → form
+  document.getElementById("owner-login-form").classList.remove("gone");
+  document.getElementById("owner-panel-inner").classList.remove("visible");
+  document.getElementById("owner-panel-inner").style.display = "none";
+  document.getElementById("owner-pass-input").value = "";
+  trigger.style.cssText = "";
+  dropdown.classList.remove("open");
+  trigger.classList.remove("active");
+});
+
+// ─── username bar ──────────────────────────────────────────────
+document.getElementById("set-name-btn").addEventListener("click", joinWithName);
+document.getElementById("uname-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") joinWithName();
+});
+document.getElementById("change-btn").addEventListener("click", () => {
+  show("uname-input"); show("set-name-btn");
+  hide("current-name-display"); hide("change-btn");
+  document.getElementById("uname-input").value = "";
+  document.getElementById("uname-input").focus();
+});
+
+function joinWithName() {
+  let name = document.getElementById("uname-input").value.trim();
+  if (!name) { document.getElementById("uname-input").focus(); return; }
+  if (isOwner) name = OWNER_NAME;
+  currentUser = name;
+  refreshNameBar();
+  spawnPresence(name);
+  // show chat input
+  hide("chat-locked");
+  show("chat-footer-real");
+  document.getElementById("msg-input").focus();
+}
+
+function refreshNameBar() {
+  hide("uname-input"); hide("set-name-btn");
+  const disp = document.getElementById("current-name-display");
+  disp.textContent = currentUser;
+  disp.style.color = isOwner ? "var(--owner)" : "var(--text)";
+  show("current-name-display"); show("change-btn");
+}
+
+// ─── presence ─────────────────────────────────────────────────
+function spawnPresence(name) {
+  if (presenceRef) { remove(presenceRef); presenceRef = null; }
+  const uid = Date.now() + "_" + Math.random().toString(36).slice(2);
+  presenceRef = ref(db, "presence/" + uid);
+  set(presenceRef, { name, t: serverTimestamp() });
+  onDisconnect(presenceRef).remove();
+}
+window.addEventListener("beforeunload", () => { if (presenceRef) remove(presenceRef); });
+
+// ─── firebase listeners (start immediately, read-only until join) ──
+onValue(ref(db, "presence"), snap => {
+  document.getElementById("online-num").textContent = snap.size || 0;
+});
+
+onValue(ref(db, "tags"), snap => {
+  cachedTags = snap.val() || {};
+  if (lastSnap) renderAll();
+});
+
+onValue(ref(db, "messages"), snap => {
+  lastSnap = snap;
+  renderAll();
+});
+
+// ─── render messages ───────────────────────────────────────────
+function renderAll() {
+  const wrap = document.getElementById("messages-wrap");
+  const atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 80;
+  const list = document.getElementById("messages-list");
+  list.innerHTML = "";
+  if (!lastSnap || !lastSnap.exists()) return;
+  lastSnap.forEach(child => {
+    const msg = child.val();
+    if (msg.type === "system") {
+      const el = document.createElement("div");
+      el.className = "msg-sys";
+      el.textContent = "— " + msg.text + " —";
+      list.appendChild(el);
+    } else {
+      list.appendChild(buildMsg(msg, child.key));
+    }
+  });
+  if (atBottom) wrap.scrollTo({ top: wrap.scrollHeight, behavior: "smooth" });
+}
+
+function buildMsg(msg, key) {
+  const ownerMsg = msg.user === OWNER_NAME;
+  const tag      = cachedTags[msg.user];
+  const initials = (msg.user || "?").slice(0, 2).toUpperCase();
+  const aColor   = strColor(msg.user || "");
+
+  let tagHTML = "";
+  if (ownerMsg) {
+    tagHTML = `<span class="owner-tag">${OWNER_BADGE}</span>`;
+  } else if (tag) {
+    const c = tag.color || "#7fff7f";
+    tagHTML = `<span class="u-tag" style="color:${c};border-color:${c}44;background:${c}15">${esc(tag.label)}</span>`;
+  }
+
+  // owner sees key on timestamp hover for easy deletion
+  const keyAttr = isOwner ? ` title="key: ${key}"` : "";
+
+  const el = document.createElement("div");
+  el.className = "msg";
+  el.dataset.key = key;
+  el.innerHTML = `
+    <div class="msg-avatar" style="color:${aColor};border-color:${aColor}28">${initials}</div>
+    <div class="msg-body">
+      <div class="msg-head">
+        <span class="msg-name${ownerMsg ? " is-owner" : ""}">${esc(msg.user)}</span>
+        ${tagHTML}
+        <span class="msg-time"${keyAttr}>${fmtTime(msg.ts)}</span>
+      </div>
+      <div class="msg-text">${esc(msg.text)}</div>
+    </div>`;
+  return el;
+}
+
+// ─── send ──────────────────────────────────────────────────────
+function sendMsg() {
+  const inp = document.getElementById("msg-input");
+  const text = inp.value.trim();
+  if (!text || !currentUser) return;
+  inp.value = "";
+  push(ref(db, "messages"), { user: currentUser, text, ts: Date.now() });
+}
+document.getElementById("send-btn").addEventListener("click", sendMsg);
+document.getElementById("msg-input").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+
+// ─── owner panel actions ───────────────────────────────────────
+document.getElementById("assign-tag-btn").addEventListener("click", () => {
+  const t = document.getElementById("tag-target").value.trim();
+  const l = document.getElementById("tag-text").value.trim().toUpperCase();
+  if (!t || !l) return;
+  set(ref(db, "tags/" + t), { label: l, color: selectedColor });
+  document.getElementById("tag-target").value = "";
+  document.getElementById("tag-text").value = "";
+});
+document.getElementById("remove-tag-btn").addEventListener("click", () => {
+  const t = document.getElementById("tag-target").value.trim();
+  if (!t) return;
+  remove(ref(db, "tags/" + t));
+});
+document.getElementById("del-msg-btn").addEventListener("click", () => {
+  const id = document.getElementById("del-msg-id").value.trim();
+  if (!id) return;
+  remove(ref(db, "messages/" + id));
+  document.getElementById("del-msg-id").value = "";
+});
+
+// ─── utils ────────────────────────────────────────────────────
+function show(id){ document.getElementById(id).classList.remove("gone"); }
+function hide(id){ document.getElementById(id).classList.add("gone"); }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function fmtTime(ts){
+  if(!ts) return "";
+  return new Date(ts).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+}
+function strColor(s){
+  let h=0; for(let i=0;i<s.length;i++) h=s.charCodeAt(i)+((h<<5)-h);
+  return `hsl(${Math.abs(h)%360},42%,58%)`;
+}
+</script>
+</body>
+</html>
