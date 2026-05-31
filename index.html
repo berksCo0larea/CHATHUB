@@ -50,13 +50,20 @@ header{
   flex-shrink:0;
 }
 .online-pill{
-  display:flex;align-items:center;gap:5px;
-  font-size:9px;color:var(--muted);letter-spacing:.12em;white-space:nowrap;
+  display:flex;align-items:center;gap:8px;
+  font-size:9px;color:var(--muted);letter-spacing:.1em;white-space:nowrap;
 }
 .online-dot{
   width:6px;height:6px;border-radius:50%;background:var(--green);
   flex-shrink:0;
   animation:blink 1.6s ease-in-out infinite;
+}
+.pill-divider{
+  width:1px;height:10px;background:var(--border-hi);
+}
+.pill-viewers{
+  display:flex;align-items:center;gap:5px;
+  font-size:9px;color:#444;letter-spacing:.1em;
 }
 
 /* ── OWNER BUTTON (inside header-right) ── */
@@ -283,7 +290,9 @@ header{
   <div class="header-right">
     <div class="online-pill">
       <div class="online-dot"></div>
-      <span id="online-num">0</span>&nbsp;ONLINE
+      <span id="online-num">0</span>&nbsp;CHATTING
+      <div class="pill-divider"></div>
+      <div class="pill-viewers">&#128065; <span id="viewer-num">0</span>&nbsp;VIEWING</div>
     </div>
     <button id="owner-trigger">⬡ OWNER</button>
   </div>
@@ -484,9 +493,24 @@ function spawnPresence(name) {
 }
 window.addEventListener("beforeunload", () => { if (presenceRef) remove(presenceRef); });
 
+// ─── viewer presence — registered for everyone immediately ───
+const viewUid = Date.now() + "_v_" + Math.random().toString(36).slice(2);
+const viewRef = ref(db, "viewers/" + viewUid);
+set(viewRef, { t: serverTimestamp() });
+onDisconnect(viewRef).remove();
+window.addEventListener("beforeunload", () => remove(viewRef));
+
 // ─── firebase listeners (start immediately, read-only until join) ──
 onValue(ref(db, "presence"), snap => {
-  document.getElementById("online-num").textContent = snap.size || 0;
+  const chatters = snap.size || 0;
+  document.getElementById("online-num").textContent = chatters;
+});
+
+onValue(ref(db, "viewers"), snap => {
+  const total = snap.size || 0;
+  const chatters = parseInt(document.getElementById("online-num").textContent) || 0;
+  const viewers = Math.max(0, total - chatters);
+  document.getElementById("viewer-num").textContent = viewers;
 });
 
 onValue(ref(db, "tags"), snap => {
