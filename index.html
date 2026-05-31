@@ -276,6 +276,37 @@ header{
   font-size:9px;color:#2e2e2e;letter-spacing:.15em;
   background:rgba(10,10,10,.98);
 }
+
+/* ── TYPING INDICATOR ── */
+#typing-bar{
+  flex-shrink:0;
+  padding:0 20px;
+  height:0;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:9px;
+  color:var(--muted);
+  letter-spacing:.12em;
+  background:rgba(10,10,10,.98);
+  transition:height .2s ease, padding .2s ease;
+}
+#typing-bar.active{
+  height:24px;
+}
+.typing-dots{
+  display:flex;gap:3px;align-items:center;
+}
+.typing-dots span{
+  width:4px;height:4px;border-radius:50%;
+  background:var(--muted);
+  display:inline-block;
+  animation:tdot .9s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2){animation-delay:.15s;}
+.typing-dots span:nth-child(3){animation-delay:.3s;}
+@keyframes tdot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-3px);opacity:1}}
 </style>
 </head>
 <body>
@@ -340,6 +371,12 @@ header{
   <div id="messages-list"></div>
 </div>
 
+<!-- TYPING INDICATOR -->
+<div id="typing-bar">
+  <div class="typing-dots"><span></span><span></span><span></span></div>
+  <span id="typing-text"></span>
+</div>
+
 <!-- FOOTER -->
 <div id="chat-footer" class="gone"></div><!-- placeholder to keep layout; real footer below -->
 <footer id="chat-footer-real" class="gone">
@@ -375,6 +412,9 @@ let presenceRef   = null;
 let selectedColor = TAG_COLORS[0];
 let cachedTags    = {};
 let lastSnap      = null;
+let typingTimeout = null;
+let typingRef    = null;
+
 
 // ─── colour swatches ───────────────────────────────────────────
 TAG_COLORS.forEach((c,i) => {
@@ -583,11 +623,69 @@ function sendMsg() {
   const text = inp.value.trim();
   if (!text || !currentUser) return;
   inp.value = "";
+  clearTimeout(typingTimeout);
+  setTyping(false);
   push(ref(db, "messages"), { user: currentUser, text, ts: Date.now() });
 }
 document.getElementById("send-btn").addEventListener("click", sendMsg);
 document.getElementById("msg-input").addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+});
+
+
+// ─── typing indicator ─────────────────────────────────────────
+function setTyping(active) {
+  if (!currentUser || !typingRef) return;
+  if (active) {
+    set(typingRef, { name: currentUser, t: Date.now() });
+  } else {
+    remove(typingRef);
+  }
+}
+
+document.getElementById("msg-input").addEventListener("input", () => {
+  if (!currentUser) return;
+  if (!typingRef) {
+    const tUid = Date.now() + "_t_" + Math.random().toString(36).slice(2);
+    typingRef = ref(db, "typing/" + tUid);
+    onDisconnect(typingRef).remove();
+  }
+  setTyping(true);
+  clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => setTyping(false), 2000);
+});
+
+document.getElementById("msg-input").addEventListener("blur", () => {
+  clearTimeout(typingTimeout);
+  setTyping(false);
+});
+
+// listen to typing node
+onValue(ref(db, "typing"), snap => {
+  const now = Date.now();
+  const names = [];
+  snap.forEach(child => {
+    const d = child.val();
+    // ignore stale entries older than 5s and ignore self
+    if (d.name !== currentUser && (now - d.t) < 5000) {
+      names.push(d.name);
+    }
+  });
+  const bar  = document.getElementById("typing-bar");
+  const text = document.getElementById("typing-text");
+  if (names.length === 0) {
+    bar.classList.remove("active");
+    text.textContent = "";
+  } else if (names.length === 1) {
+    text.textContent = names[0] + " is typing…";
+    bar.classList.add("active");
+  } else if (names.length === 2) {
+    text.textContent = names[0] + " and " + names[1] + " are typing…";
+    bar.classList.add("active");
+  } else {
+    text.textContent = names.length + " people are typing…";
+    bar.classList.add("active");
+  }
 });
 
 // ─── owner panel actions ───────────────────────────────────────
